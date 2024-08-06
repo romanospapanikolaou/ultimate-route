@@ -5,21 +5,19 @@ class RouteCalculator extends HTMLElement {
     this.shadowRoot.innerHTML = `
           <div id="map"></div>
           <div id="controls">
-              <input id="start" type="text" placeholder="Start Location">
-              <div id="waypoints"></div>
-              <button id="addWaypoint">Add Waypoint</button>
-              <input id="end" type="text" placeholder="End Location">
-              <button id="startNavigation">START</button>
+              <button id="generateLocations">Generate Random Locations</button>
+              <button id="startNavigation" disabled>START</button>
           </div>
           <div id="directions"></div>
       `;
+    this.randomLocations = [];
   }
 
   connectedCallback() {
     this.initMap();
     this.shadowRoot
-      .getElementById("addWaypoint")
-      .addEventListener("click", () => this.addWaypoint());
+      .getElementById("generateLocations")
+      .addEventListener("click", () => this.generateRandomLocations());
     this.shadowRoot
       .getElementById("startNavigation")
       .addEventListener("click", () => this.calculateAndStartNavigation());
@@ -36,78 +34,133 @@ class RouteCalculator extends HTMLElement {
     this.directionsRenderer.setPanel(
       this.shadowRoot.getElementById("directions")
     );
-
-    const startInput = this.shadowRoot.getElementById("start");
-    const endInput = this.shadowRoot.getElementById("end");
-    const options = {
-      fields: ["place_id", "geometry", "name"],
-      strictBounds: false,
-    };
-    new google.maps.places.Autocomplete(startInput, options);
-    new google.maps.places.Autocomplete(endInput, options);
   }
 
-  addWaypoint() {
-    const waypointsContainer = this.shadowRoot.getElementById("waypoints");
-    const waypointDiv = document.createElement("div");
-    waypointDiv.className = "waypoint-container";
+  generateRandomLocations() {
+    const numberOfLocations = 40;
+    const bounds = {
+      north: 59.4043,
+      south: 59.2543,
+      east: 18.1086,
+      west: 17.9286,
+    };
 
-    const waypointInput = document.createElement("input");
-    waypointInput.className = "waypoint";
-    waypointInput.type = "text";
-    waypointInput.placeholder = "Waypoint Location";
+    this.randomLocations = [];
+    for (let i = 0; i < numberOfLocations; i++) {
+      const lat = bounds.south + Math.random() * (bounds.north - bounds.south);
+      const lng = bounds.west + Math.random() * (bounds.east - bounds.west);
+      this.randomLocations.push({ lat, lng });
+    }
 
-    const deleteButton = document.createElement("button");
-    deleteButton.textContent = "Delete";
-    deleteButton.className = "delete-waypoint";
-    deleteButton.addEventListener("click", () => waypointDiv.remove());
+    console.log("Random Locations: ", this.randomLocations);
 
-    waypointDiv.appendChild(waypointInput);
-    waypointDiv.appendChild(deleteButton);
-    waypointsContainer.appendChild(waypointDiv);
-
-    new google.maps.places.Autocomplete(waypointInput, {
-      fields: ["place_id", "geometry", "name"],
-      strictBounds: false,
+    // Clear existing markers
+    this.randomLocations.forEach((location) => {
+      new google.maps.Marker({
+        position: location,
+        map: this.map,
+      });
     });
+
+    this.shadowRoot.getElementById("startNavigation").disabled = false;
   }
 
   calculateAndStartNavigation() {
-    const start = this.shadowRoot.getElementById("start").value;
-    const end = this.shadowRoot.getElementById("end").value;
-    const waypointsElements = this.shadowRoot.querySelectorAll(".waypoint");
-    const waypoints = Array.from(waypointsElements).map((input) => ({
-      location: input.value,
+    if (this.randomLocations.length < 2) {
+      alert("Please generate at least two locations.");
+      return;
+    }
+
+    const startLocation = this.randomLocations[0];
+    const endLocation = this.randomLocations[this.randomLocations.length - 1];
+    const waypoints = this.randomLocations.slice(1, -1).map((location) => ({
+      location: new google.maps.LatLng(location.lat, location.lng),
       stopover: true,
     }));
 
-    this.directionsService.route(
-      {
-        origin: start,
-        destination: end,
-        waypoints: waypoints,
-        optimizeWaypoints: true,
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
-      (response, status) => {
-        if (status === "OK") {
-          this.directionsRenderer.setDirections(response);
-          this.startNavigation(start, end, waypoints);
-        } else {
-          window.alert("Directions request failed due to " + status);
-        }
-      }
-    );
+    const chunks = this.chunkArray(waypoints, 23); // Google Maps allows up to 23 waypoints
+
+    this.calculateRouteChunks(startLocation, endLocation, chunks);
   }
 
-  startNavigation(start, end, waypoints) {
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
-      start
-    )}&destination=${encodeURIComponent(end)}`;
+  chunkArray(array, size) {
+    const result = [];
+    for (let i = 0; i < array.length; i += size) {
+      result.push(array.slice(i, i + size));
+    }
+    return result;
+  }
 
-    if (waypoints.length > 0) {
+  calculateRouteChunks(startLocation, endLocation, chunks) {
+    let currentStart = new google.maps.LatLng(
+      startLocation.lat,
+      startLocation.lng
+    );
+    let totalRoute = [];
+    const chunkPromises = chunks.map((chunk, index) => {
+      const nextEnd =
+        index === chunks.length - 1
+          ? new google.maps.LatLng(endLocation.lat, endLocation.lng)
+          : undefined;
+      return new Promise((resolve, reject) => {
+        this.directionsService.route(
+          {
+            origin: currentStart,
+            destination: nextEnd || currentStart, // Use nextEnd only if it's not the last chunk
+            waypoints: chunk,
+            optimizeWaypoints: false,
+            travelMode: google.maps.TravelMode.DRIVING,
+          },
+          (response, status) => {
+            if (status === "OK") {
+              totalRoute = totalRoute.concat(response.routes[0].overview_path);
+              currentStart =
+                response.routes[0].legs[response.routes[0].legs.length - 1]
+                  .end_location;
+              resolve(response);
+            } else {
+              reject("Directions request failed due to " + status);
+            }
+          }
+        );
+      });
+    });
+
+    Promise.all(chunkPromises)
+      .then(() => {
+        // Render the combined route
+        this.renderCombinedRoute(totalRoute);
+        this.startNavigation(startLocation, endLocation);
+      })
+      .catch((error) => {
+        window.alert(error);
+      });
+  }
+
+  renderCombinedRoute(routePath) {
+    const path = new google.maps.Polyline({
+      path: routePath,
+      geodesic: true,
+      strokeColor: "#FF0000",
+      strokeOpacity: 1.0,
+      strokeWeight: 2,
+    });
+    path.setMap(this.map);
+  }
+
+  startNavigation(startLocation, endLocation) {
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
+      startLocation.lat + "," + startLocation.lng
+    )}&destination=${encodeURIComponent(
+      endLocation.lat + "," + endLocation.lng
+    )}`;
+
+    if (this.randomLocations.length > 2) {
+      const waypoints = this.randomLocations.slice(1, -1);
       url += `&waypoints=${waypoints
-        .map((waypoint) => encodeURIComponent(waypoint.location))
+        .map((location) =>
+          encodeURIComponent(location.lat + "," + location.lng)
+        )
         .join("|")}`;
     }
 
