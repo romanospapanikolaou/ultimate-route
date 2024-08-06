@@ -26,7 +26,7 @@ class RouteCalculator extends HTMLElement {
   initMap() {
     this.map = new google.maps.Map(this.shadowRoot.getElementById("map"), {
       center: { lat: 59.3293, lng: 18.0686 }, // Stockholm coordinates
-      zoom: 10,
+      zoom: 14, // Adjust zoom level to better view the central area
     });
     this.directionsService = new google.maps.DirectionsService();
     this.directionsRenderer = new google.maps.DirectionsRenderer();
@@ -39,10 +39,10 @@ class RouteCalculator extends HTMLElement {
   generateRandomLocations() {
     const numberOfLocations = 40;
     const bounds = {
-      north: 59.4043,
-      south: 59.2543,
-      east: 18.1086,
-      west: 17.9286,
+      north: 59.383524,
+      south: 59.287392,
+      east: 18.176392,
+      west: 18.007272,
     };
 
     this.randomLocations = [];
@@ -54,14 +54,7 @@ class RouteCalculator extends HTMLElement {
 
     console.log("Random Locations: ", this.randomLocations);
 
-    // Clear existing markers
-    this.randomLocations.forEach((location) => {
-      new google.maps.Marker({
-        position: location,
-        map: this.map,
-      });
-    });
-
+    // Enable the START button
     this.shadowRoot.getElementById("startNavigation").disabled = false;
   }
 
