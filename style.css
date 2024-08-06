@@ -1,0 +1,84 @@
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  background-color: #f7f7f7;
+}
+
+route-calculator {
+  width: 500px;
+  background: #ffffff;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+#map {
+  height: 400px;
+  width: 100%;
+  border-radius: 10px;
+  margin-bottom: 15px;
+}
+
+#controls {
+  display: flex;
+  flex-direction: column;
+}
+
+#controls input,
+#controls button {
+  padding: 10px;
+  margin: 5px 0;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+#controls button {
+  background-color: #007bff;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+#controls button:hover {
+  background-color: #0056b3;
+}
+
+.waypoint-container {
+  display: flex;
+  align-items: center;
+  margin-top: 5px;
+}
+
+.waypoint-container input {
+  flex: 1;
+  margin-right: 10px;
+}
+
+.delete-waypoint {
+  padding: 8px;
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.delete-waypoint:hover {
+  background-color: #ff0000;
+}
+
+#directions {
+  margin-top: 15px;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
